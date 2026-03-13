@@ -2,64 +2,178 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>רמיקוב טקטי - גרסת תיקון סופית</title>
-    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700&display=swap" rel="stylesheet">
+    <title>רמיקוב טקטי - גרסה עובדת</title>
     <style>
-        :root { --bg: #0a0e14; --panel: #16213e; --text: #00e5ff; --tile-bg: #fffbe0; --danger: #ff4757; }
-        body { margin: 0; background: var(--bg); color: #fff; font-family: 'Assistant', sans-serif; overflow: hidden; user-select: none; }
-        #game-layout { display: flex; flex-direction: column; height: 100vh; }
-        #hud { height: 70px; background: rgba(0,0,0,0.8); display: flex; justify-content: space-around; align-items: center; border-bottom: 2px solid var(--text); }
-        #timer { font-size: 28px; color: var(--text); font-weight: bold; }
-        .low-time { color: var(--danger) !important; animation: blink 0.5s infinite; }
-        @keyframes blink { 50% { opacity: 0.3; } }
-        #table { flex-grow: 1; background: radial-gradient(circle, #1a2a3a 0%, #0a0e14 100%); padding: 25px; display: flex; flex-wrap: wrap; gap: 15px; overflow-y: auto; }
-        .set { border: 2px dashed rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; display: flex; gap: 5px; min-width: 100px; min-height: 80px; }
-        #player-hand-container { height: 190px; background: var(--panel); padding: 15px; border-top: 2px solid var(--text); }
-        #player-hand { display: flex; gap: 8px; overflow-x: auto; height: 100px; align-items: center; }
-        .tile { width: 45px; height: 65px; background: var(--tile-bg); border: 2px solid #d4a373; border-radius: 5px; color: #000; display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; cursor: grab; }
-        .tile.joker { background: #f1c40f; color: #fff !important; }
-        #controls { margin-top: 10px; display: flex; gap: 10px; justify-content: center; }
-        .btn { background: transparent; border: 2px solid var(--text); color: var(--text); padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        .btn:hover:not(:disabled) { background: var(--text); color: #000; }
-        .btn:disabled { opacity: 0.2; }
-        #overlay { position: absolute; inset: 0; background: var(--bg); z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .start-btn { background: none; border: 3px solid var(--text); color: var(--text); padding: 15px 50px; font-size: 24px; cursor: pointer; }
+        body { background: #0a0e14; color: white; font-family: sans-serif; text-align: center; margin: 0; overflow: hidden; }
+        #overlay { position: fixed; inset: 0; background: #0a0e14; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .start-btn { background: #00e5ff; color: black; border: none; padding: 20px 60px; font-size: 24px; cursor: pointer; font-weight: bold; border-radius: 50px; box-shadow: 0 0 20px #00e5ff; }
+        .start-btn:hover { background: white; }
+        #game-layout { display: none; flex-direction: column; height: 100vh; }
+        #hud { height: 60px; background: #16213e; display: flex; justify-content: space-around; align-items: center; border-bottom: 2px solid #00e5ff; }
+        #table { flex-grow: 1; padding: 20px; display: flex; flex-wrap: wrap; gap: 10px; overflow-y: auto; }
+        #player-hand { height: 150px; background: #16213e; display: flex; gap: 5px; padding: 15px; overflow-x: auto; align-items: center; border-top: 2px solid #00e5ff; }
+        .tile { width: 40px; height: 60px; background: #fffbe0; border: 2px solid #d4a373; border-radius: 5px; color: black; display: flex; justify-content: center; align-items: center; font-size: 20px; font-weight: bold; cursor: grab; flex-shrink: 0; }
+        .joker { background: #f1c40f; color: white !important; }
+        .set { border: 1px dashed #444; padding: 10px; display: flex; gap: 5px; min-height: 70px; }
+        #controls { background: #16213e; padding: 10px; display: flex; gap: 10px; justify-content: center; }
+        .btn { background: none; border: 1px solid #00e5ff; color: #00e5ff; padding: 5px 15px; cursor: pointer; border-radius: 4px; }
     </style>
 </head>
 <body>
 
 <div id="overlay">
-    <h1 style="font-size: 40px; color: var(--text);">רמיקוב טקטי</h1>
-    <button class="start-btn" id="realStartBtn">התחל משחק</button>
+    <h1 style="color: #00e5ff; font-size: 48px;">רמיקוב ELITE</h1>
+    <button class="start-btn" onclick="initGame()">התחל משחק</button>
 </div>
 
 <div id="game-layout">
     <div id="hud">
-        <div class="stat">קופה: <span id="pool-count">0</span></div>
-        <div id="timer">60</div>
-        <div class="stat">מחשב: <span id="comp-count">0</span></div>
+        <div>קופה: <span id="pool-txt">0</span></div>
+        <div id="timer" style="font-size: 24px; font-weight: bold;">60</div>
+        <div>מחשב: <span id="comp-txt">0</span></div>
     </div>
     <div id="table"></div>
-    <div id="player-hand-container">
-        <div id="player-hand"></div>
-        <div id="controls">
-            <button class="btn" id="sortVal">סדר מספרים</button>
-            <button class="btn" id="sortCol">סדר צבעים</button>
-            <button class="btn" id="btnFinish" disabled>אשר מהלך</button>
-            <button class="btn" id="btnDraw">קח אריח</button>
-        </div>
+    <div id="controls">
+        <button class="btn" onclick="sortHand()">סדר יד</button>
+        <button class="btn" onclick="drawTile()" id="drawBtn">משוך אריח</button>
+        <button class="btn" onclick="endTurn()" id="finishBtn" disabled>סיים תור</button>
     </div>
+    <div id="player-hand"></div>
 </div>
 
 <script>
-// אתחול משתנים בסיסיים מיד עם טעינת הדף
-const colors = ['#e94560', '#00e5ff', '#2c3e50', '#f1c40f'];
-let pool = [], playerHand = [], compHand = [], tableSets = [], tempSet = [];
-let turn = 'player', hasDrawn = false, timeLeft = 60, timerInterval;
+    let pool = [], playerHand = [], compHand = [], tableSets = [], tempSet = [];
+    let timeLeft = 60, timerInterval;
 
-function createDeck() {
-    pool = [];
-    let id = 0;
-    for (let i = 0; i < 2; i++) {
-        colors.forEach(c => {
-            for (let
+    function initGame() {
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('game-layout').style.display = 'flex';
+        
+        // יצירת קופה
+        const colors = ['red', '#00e5ff', 'white', 'yellow'];
+        let id = 0;
+        for (let i = 0; i < 2; i++) {
+            colors.forEach(c => {
+                for (let v = 1; v <= 13; v++) pool.push({v, c, id: id++, j: false});
+            });
+        }
+        pool.push({v: '☺', c: 'orange', id: id++, j: true});
+        pool.push({v: '☺', c: 'orange', id: id++, j: true});
+        
+        pool.sort(() => Math.random() - 0.5);
+
+        // חלוקה
+        for (let i = 0; i < 14; i++) {
+            playerHand.push(pool.pop());
+            compHand.push(pool.pop());
+        }
+
+        render();
+        startTimer();
+    }
+
+    function render() {
+        const handEl = document.getElementById('player-hand');
+        handEl.innerHTML = '';
+        playerHand.forEach(t => {
+            const el = document.createElement('div');
+            el.className = 'tile' + (t.j ? ' joker' : '');
+            el.style.color = t.c;
+            el.textContent = t.v;
+            el.onclick = () => moveToTable(t.id);
+            handEl.appendChild(el);
+        });
+
+        const tableEl = document.getElementById('table');
+        tableEl.innerHTML = '';
+        
+        // הצגת סטים מאושרים
+        tableSets.forEach(s => {
+            const setEl = document.createElement('div');
+            setEl.className = 'set';
+            s.forEach(t => {
+                const el = document.createElement('div');
+                el.className = 'tile' + (t.j ? ' joker' : '');
+                el.style.color = t.c;
+                el.textContent = t.v;
+                setEl.appendChild(el);
+            });
+            tableEl.appendChild(setEl);
+        });
+
+        // הצגת הסט הזמני
+        if(tempSet.length > 0) {
+            const tempEl = document.createElement('div');
+            tempEl.className = 'set';
+            tempEl.style.border = '2px solid #00e5ff';
+            tempSet.forEach(t => {
+                const el = document.createElement('div');
+                el.className = 'tile' + (t.j ? ' joker' : '');
+                el.style.color = t.c;
+                el.textContent = t.v;
+                el.onclick = () => returnToHand(t.id);
+                tempEl.appendChild(el);
+            });
+            tableEl.appendChild(tempEl);
+        }
+
+        document.getElementById('pool-txt').textContent = pool.length;
+        document.getElementById('comp-txt').textContent = compHand.length;
+        document.getElementById('finishBtn').disabled = tempSet.length === 0;
+    }
+
+    function moveToTable(id) {
+        const idx = playerHand.findIndex(t => t.id === id);
+        if(idx !== -1) {
+            tempSet.push(playerHand.splice(idx, 1)[0]);
+            render();
+        }
+    }
+
+    function returnToHand(id) {
+        const idx = tempSet.findIndex(t => t.id === id);
+        if(idx !== -1) {
+            playerHand.push(tempSet.splice(idx, 1)[0]);
+            render();
+        }
+    }
+
+    function drawTile() {
+        if(pool.length > 0) {
+            playerHand.push(pool.pop());
+            endTurn();
+        }
+    }
+
+    function endTurn() {
+        if(tempSet.length > 0) {
+            tableSets.push([...tempSet]);
+            tempSet = [];
+        }
+        timeLeft = 60;
+        // תור מחשב פשוט
+        if(pool.length > 0) compHand.push(pool.pop());
+        render();
+    }
+
+    function startTimer() {
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            document.getElementById('timer').textContent = timeLeft;
+            if(timeLeft <= 0) {
+                if(tempSet.length > 0) {
+                    playerHand.push(...tempSet);
+                    tempSet = [];
+                }
+                drawTile();
+            }
+        }, 1000);
+    }
+
+    function sortHand() {
+        playerHand.sort((a,b) => a.v - b.v);
+        render();
+    }
+</script>
+</body>
+</html>
