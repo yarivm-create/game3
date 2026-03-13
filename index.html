@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>רמיקוב PRO - חוקים סופיים</title>
+    <title>רמיקוב PRO - השופט החכם</title>
     <style>
         body { background: #0a0e14; color: white; font-family: sans-serif; text-align: center; margin: 0; overflow: hidden; }
         #overlay { position: fixed; inset: 0; background: #0a0e14; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
@@ -21,9 +21,8 @@
             width: 40px; height: 58px; background: #fffbe0; border: 2px solid #d4a373; border-radius: 5px; 
             color: black; display: flex; justify-content: center; align-items: center; 
             font-size: 20px; font-weight: 800; cursor: pointer; flex-shrink: 0; box-shadow: 2px 2px 4px rgba(0,0,0,0.4);
-            user-select: none; transition: transform 0.1s;
+            user-select: none;
         }
-        .tile:active { transform: scale(0.9); }
         .joker { background: #f1c40f !important; color: #fff !important; }
         
         .set-box { border: 2px solid rgba(255,255,255,0.1); padding: 8px; display: flex; gap: 4px; border-radius: 6px; background: rgba(255,255,255,0.05); min-height: 60px; }
@@ -32,14 +31,14 @@
         #controls { background: #16213e; padding: 10px; display: flex; gap: 10px; justify-content: center; direction: rtl; }
         .btn { background: none; border: 1px solid #00e5ff; color: #00e5ff; padding: 8px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; }
         .btn.danger { border-color: #ff4757; color: #ff4757; }
-        #msg-bar { background: #ff4757; color: white; font-size: 14px; padding: 8px; display: none; position: fixed; top: 65px; width: 100%; z-index: 50; }
+        #msg-bar { background: #ff4757; color: white; font-size: 14px; padding: 12px; display: none; position: fixed; top: 65px; width: 100%; z-index: 50; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div id="overlay">
-    <h1 style="color: #00e5ff;">רמיקוב - חוקי הברזל</h1>
-    <button class="start-btn" onclick="initGame()">שחק</button>
+    <h1 style="color: #00e5ff;">רמיקוב PRO - גרסת השופט</h1>
+    <button class="start-btn" onclick="initGame()">שחק עכשיו</button>
 </div>
 
 <div id="game-layout">
@@ -50,19 +49,19 @@
         <div>קלפי מחשב: <span id="comp-txt">0</span></div>
     </div>
     
-    <div id="msg-bar">הודעת שגיאה</div>
+    <div id="msg-bar">הודעה</div>
     <div id="table"></div>
 
     <div id="controls">
         <button class="btn" onclick="sortHand('value')">מספרים</button>
         <button class="btn" onclick="sortHand('color')">צבעים</button>
-        <button class="btn danger" onclick="rollbackTurn()" id="resetBtn">נקה ↩</button>
-        <button class="btn" onclick="drawAndEnd()">משוך אריח</button>
+        <button class="btn danger" onclick="rollbackTurn()" id="resetBtn">בטל מהלכים ↩</button>
+        <button class="btn" onclick="drawAndEnd()">משוך וסיים</button>
         <button class="btn" onclick="validateAndFinish()" id="finishBtn" style="border-color:#f1c40f; color:#f1c40f;">אשר מהלך</button>
     </div>
 
     <div id="player-hand">
-        <div id="lock" class="turn-lock">תור המחשב...</div>
+        <div id="lock" class="turn-lock">השופט בודק... ⚖️</div>
         <div id="hand-content"></div>
     </div>
 </div>
@@ -87,7 +86,7 @@
         for (let i = 0; i < 2; i++) {
             colors.forEach(c => { for (let v = 1; v <= 13; v++) pool.push({v, c, id: id++, j: false}); });
         }
-        pool.push({v: '☺', c: '#000', id: id++, j: true}, {v: '☺', c: '#000', id: id++, j: true});
+        pool.push({v: 0, c: '#000', id: id++, j: true}, {v: 0, c: '#000', id: id++, j: true});
         pool.sort(() => Math.random() - 0.5);
         playerHand = pool.splice(0, 14);
         compHand = pool.splice(0, 14);
@@ -105,147 +104,29 @@
         render();
     }
 
-    function render() {
-        const table = document.getElementById('table');
-        table.innerHTML = '';
-
-        tableSets.forEach((set, sIdx) => {
-            const div = document.createElement('div');
-            div.className = 'set-box';
-            set.forEach((t, tIdx) => {
-                const el = createTile(t);
-                el.onclick = () => {
-                    if(currentTurn !== 'player') return;
-                    currentTurnSets[currentTurnSets.length-1].push(set.splice(tIdx, 1)[0]);
-                    if(set.length === 0) tableSets.splice(sIdx, 1);
-                    render();
-                };
-                div.appendChild(el);
-            });
-            table.appendChild(div);
-        });
-
-        if (currentTurn === 'player') {
-            currentTurnSets.forEach((set, sIdx) => {
-                const div = document.createElement('div');
-                div.className = 'set-box new-set-area';
-                set.forEach((t, tIdx) => {
-                    const el = createTile(t);
-                    el.onclick = () => { 
-                        playerHand.push(set.splice(tIdx, 1)[0]); 
-                        render(); 
-                    };
-                    div.appendChild(el);
-                });
-                table.appendChild(div);
-            });
-            const addSet = document.createElement('button');
-            addSet.className = 'btn'; addSet.textContent = "+";
-            addSet.onclick = () => { currentTurnSets.push([]); render(); };
-            table.appendChild(addSet);
-        }
-
-        const hand = document.getElementById('hand-content');
-        hand.innerHTML = '';
-        playerHand.forEach(t => {
-            const el = createTile(t);
-            el.onclick = () => {
-                if(currentTurn !== 'player') return;
-                currentTurnSets[currentTurnSets.length-1].push(t);
-                playerHand = playerHand.filter(x => x.id !== t.id);
-                render();
-            };
-            hand.appendChild(el);
-        });
-
-        document.getElementById('pool-txt').textContent = pool.length;
-        document.getElementById('comp-txt').textContent = compHand.length;
-        document.getElementById('lock').style.display = currentTurn === 'comp' ? 'flex' : 'none';
+    // --- ליבת הבדיקה: האם סדרה חוקית? ---
+    function isSetValid(set) {
+        if (set.length < 3) return false;
         
-        // כפתור אישור פעיל רק אם בוצע שינוי
-        const changed = JSON.stringify(playerHand) !== JSON.stringify(backupHand) || currentTurnSets.some(s => s.length > 0);
-        document.getElementById('finishBtn').disabled = !changed;
-    }
+        // הפרדת ג'וקרים
+        const jokers = set.filter(t => t.j);
+        const normals = set.filter(t => !t.j);
 
-    function createTile(t) {
-        const el = document.createElement('div');
-        el.className = 'tile' + (t.j ? ' joker' : '');
-        el.style.color = t.c;
-        el.textContent = t.j ? '☺' : t.v;
-        return el;
-    }
+        if (normals.length === 0) return true; // רק ג'וקרים (לא סביר אבל חוקי)
 
-    function validateAndFinish() {
-        let activeSets = currentTurnSets.filter(s => s.length > 0);
-        let allSets = [...tableSets, ...activeSets];
-        
-        // בדיקת שינוי מינימלי
-        if (JSON.stringify(playerHand) === JSON.stringify(backupHand) && activeSets.length === 0) {
-            showError("לא בוצע מהלך. משוך אריח כדי לסיים.");
-            return;
+        // בדיקה 1: האם זו קבוצה (אותו מספר, צבעים שונים)?
+        const sameValue = normals.every(t => t.v === normals[0].v);
+        if (sameValue) {
+            const usedColors = normals.map(t => t.c);
+            const uniqueColors = new Set(usedColors);
+            return uniqueColors.size === usedColors.length && set.length <= 4;
         }
 
-        // בדיקת חוק ה-30
-        if(!hasMadeFirstMove) {
-            let sum = activeSets.reduce((a, s) => a + s.reduce((b, t) => b + (t.j?10:t.v), 0), 0);
-            if(sum < 30) { showError("פתיחה דורשת 30 נקודות מהיד!"); return; }
-            hasMadeFirstMove = true;
-        }
-
-        // בדיקת חוקיות השולחן
-        for(let s of allSets) {
-            if(s.length < 3) { showError("שולחן לא תקין: כל סדרה חייבת 3 אריחים!"); return; }
-        }
-
-        tableSets = allSets;
-        currentTurnSets = [[]];
-        saveBackup();
-        if(playerHand.length === 0) { alert("ניצחת!"); location.reload(); }
-        else startCompTurn();
-    }
-
-    function startCompTurn() {
-        currentTurn = 'comp'; render();
-        setTimeout(() => {
-            if (pool.length > 0) compHand.push(pool.pop());
-            currentTurn = 'player'; timeLeft = 60; 
-            saveBackup();
-            render();
-        }, 1500);
-    }
-
-    function drawAndEnd() {
-        rollbackTurn();
-        if (pool.length > 0) playerHand.push(pool.pop());
-        saveBackup();
-        startCompTurn();
-    }
-
-    function showError(msg) {
-        const b = document.getElementById('msg-bar');
-        b.textContent = msg; b.style.display = 'block';
-        setTimeout(() => b.style.display = 'none', 3000);
-    }
-
-    function sortHand(mode) {
-        if(mode === 'value') playerHand.sort((a,b) => (a.j?99:a.v) - (b.j?99:b.v) || a.c.localeCompare(b.c));
-        else playerHand.sort((a,b) => a.c.localeCompare(b.c) || (a.j?99:a.v) - (b.j?99:b.v));
-        render();
-    }
-
-    function startTimer() {
-        clearInterval(timerInterval);
-        timerInterval = setInterval(() => {
-            if(currentTurn === 'player') {
-                timeLeft--; 
-                document.getElementById('timer').textContent = timeLeft;
-                if(timeLeft <= 0) {
-                    showError("נגמר הזמן! המהלכים בוטלו וקיבלת אריח עונש.");
-                    drawAndEnd();
-                }
-            }
-        }, 1000);
-    }
-</script>
-</body>
-</html>
+        // בדיקה 2: האם זו סדרה עולה (אותו צבע, מספרים עוקבים)?
+        const sameColor = normals.every(t => t.c === normals[0].c);
+        if (sameColor) {
+            const sorted = [...set].sort((a, b) => (a.j ? 0 : a.v) - (b.j ? 0 : b.v));
+            // בדיקה מורכבת שמתחשבת בג'וקרים כממלאי מקום
+            let gaps = 0;
+            let sortedNormals = normals.sort((a,b) => a.v - b.v);
+            for(let i=0; i < sortedNormals.length -
