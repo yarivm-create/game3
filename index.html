@@ -2,31 +2,42 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>רמיקוב טקטי - חוק ה-30</title>
+    <title>רמיקוב פרו - גרסה יציבה</title>
     <style>
         body { background: #0a0e14; color: white; font-family: sans-serif; text-align: center; margin: 0; overflow: hidden; }
         #overlay { position: fixed; inset: 0; background: #0a0e14; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .start-btn { background: #00e5ff; color: black; border: none; padding: 20px 60px; font-size: 24px; cursor: pointer; font-weight: bold; border-radius: 50px; box-shadow: 0 0 20px #00e5ff; }
+        
         #game-layout { display: none; flex-direction: column; height: 100vh; }
         #hud { height: 60px; background: #16213e; display: flex; justify-content: space-around; align-items: center; border-bottom: 2px solid #00e5ff; }
         #table { flex-grow: 1; padding: 20px; display: flex; flex-wrap: wrap; gap: 10px; overflow-y: auto; background: #0f172a; }
         #player-hand { height: 150px; background: #16213e; display: flex; gap: 8px; padding: 15px; overflow-x: auto; align-items: center; border-top: 2px solid #00e5ff; }
-        .tile { width: 42px; height: 62px; background: #fffbe0; border: 2px solid #d4a373; border-radius: 6px; color: black; display: flex; justify-content: center; align-items: center; font-size: 22px; font-weight: 800; cursor: pointer; flex-shrink: 0; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); transition: 0.2s; }
-        .tile:hover { transform: translateY(-5px); border-color: #00e5ff; }
+        
+        .tile { 
+            width: 42px; height: 62px; 
+            background: #fffbe0; 
+            border: 2px solid #d4a373; 
+            border-radius: 6px; 
+            color: black; 
+            display: flex; justify-content: center; align-items: center; 
+            font-size: 22px; font-weight: 800; 
+            cursor: pointer; flex-shrink: 0;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+        }
         .joker { background: #f1c40f !important; color: #fff !important; }
         .set { border: 1px dashed rgba(255,255,255,0.2); padding: 10px; display: flex; gap: 5px; min-height: 75px; border-radius: 8px; }
+        
         #controls { background: #16213e; padding: 10px; display: flex; gap: 12px; justify-content: center; align-items: center; }
         .btn { background: none; border: 1px solid #00e5ff; color: #00e5ff; padding: 8px 18px; cursor: pointer; border-radius: 4px; font-weight: bold; }
-        .btn:hover:not(:disabled) { background: #00e5ff; color: black; }
         .btn:disabled { opacity: 0.3; }
-        #status-msg { color: #f1c40f; font-weight: bold; font-size: 14px; position: absolute; bottom: 170px; width: 100%; }
+        #status-msg { color: #f1c40f; font-weight: bold; padding: 5px; background: rgba(0,0,0,0.3); }
     </style>
 </head>
 <body>
 
 <div id="overlay">
     <h1 style="color: #00e5ff; font-size: 48px; margin-bottom: 20px;">רמיקוב פרו</h1>
-    <p style="color: #888; margin-bottom: 30px;">חוק הורדה ראשונה: 30 נקודות</p>
+    <p>חוק הורדה ראשונה: 30 נקודות</p>
     <button class="start-btn" onclick="initGame()">התחל משחק</button>
 </div>
 
@@ -39,23 +50,37 @@
     <div id="table"></div>
     <div id="status-msg"></div>
     <div id="controls">
-        <button class="btn" onclick="sortHand('value')">מספרים</button>
-        <button class="btn" onclick="sortHand('color')">צבעים</button>
+        <button class="btn" onclick="sortHand('value')">סדר מספרים</button>
+        <button class="btn" onclick="sortHand('color')">סדר צבעים</button>
         <button class="btn" onclick="drawTile()" id="drawBtn">משוך אריח</button>
-        <button class="btn" onclick="endTurn()" id="finishBtn" disabled style="border-color: #f1c40f; color: #f1c40f;">אשר הורדה</button>
+        <button class="btn" onclick="endTurn()" id="finishBtn" disabled>אשר מהלך</button>
     </div>
     <div id="player-hand"></div>
 </div>
 
 <script>
+    // הגדרת משתנים גלובליים
     let pool = [], playerHand = [], compHand = [], tableSets = [], tempSet = [];
     let timeLeft = 60, timerInterval;
     let hasDrawnThisTurn = false;
-    let hasMadeFirstMove = false; // מעקב אחרי חוק ה-30
+    let hasMadeFirstMove = false;
 
+    // פונקציית האתחול חייבת להיות זמינה תמיד
     function initGame() {
-        document.getElementById('overlay').style.display = 'none';
-        document.getElementById('game-layout').style.display = 'flex';
+        console.log("Game Starting...");
+        const overlay = document.getElementById('overlay');
+        const layout = document.getElementById('game-layout');
+        
+        if (overlay) overlay.style.display = 'none';
+        if (layout) layout.style.display = 'flex';
+        
+        setupDeck();
+        render();
+        startTimer();
+    }
+
+    function setupDeck() {
+        pool = [];
         const colors = ['#ff4757', '#0a3d62', '#2ed573', '#ffa502'];
         let id = 0;
         for (let i = 0; i < 2; i++) {
@@ -66,19 +91,135 @@
         pool.push({v: '☺', c: '#ffffff', id: id++, j: true});
         pool.push({v: '☺', c: '#ffffff', id: id++, j: true});
         pool.sort(() => Math.random() - 0.5);
+
+        playerHand = [];
+        compHand = [];
         for (let i = 0; i < 14; i++) {
             playerHand.push(pool.pop());
             compHand.push(pool.pop());
         }
-        render();
-        startTimer();
     }
 
     function render() {
         const handEl = document.getElementById('player-hand');
+        if (!handEl) return;
         handEl.innerHTML = '';
         playerHand.forEach(t => {
             const el = document.createElement('div');
             el.className = 'tile' + (t.j ? ' joker' : '');
             el.style.color = t.c;
-            el.textContent = t.j ? '☺'
+            el.textContent = t.j ? '☺' : t.v;
+            el.onclick = () => moveToTable(t.id);
+            handEl.appendChild(el);
+        });
+
+        const tableEl = document.getElementById('table');
+        tableEl.innerHTML = '';
+        tableSets.forEach(s => {
+            const setEl = document.createElement('div');
+            setEl.className = 'set';
+            s.forEach(t => {
+                const tile = document.createElement('div');
+                tile.className = 'tile' + (t.j ? ' joker' : '');
+                tile.style.color = t.c;
+                tile.textContent = t.j ? '☺' : t.v;
+                setEl.appendChild(tile);
+            });
+            tableEl.appendChild(setEl);
+        });
+
+        if(tempSet.length > 0) {
+            const tempEl = document.createElement('div');
+            tempEl.className = 'set';
+            tempEl.style.border = '2px solid #f1c40f';
+            tempSet.forEach(t => {
+                const el = document.createElement('div');
+                el.className = 'tile' + (t.j ? ' joker' : '');
+                el.style.color = t.c;
+                el.textContent = t.j ? '☺' : t.v;
+                el.onclick = () => returnToHand(t.id);
+                tempEl.appendChild(el);
+            });
+            tableEl.appendChild(tempEl);
+        }
+
+        document.getElementById('pool-txt').textContent = pool.length;
+        document.getElementById('comp-txt').textContent = compHand.length;
+        document.getElementById('finishBtn').disabled = (tempSet.length === 0 && !hasDrawnThisTurn);
+        document.getElementById('drawBtn').disabled = (hasDrawnThisTurn || tempSet.length > 0);
+    }
+
+    function moveToTable(id) {
+        const idx = playerHand.findIndex(t => t.id === id);
+        if(idx !== -1) {
+            tempSet.push(playerHand.splice(idx, 1)[0]);
+            if(!hasMadeFirstMove) {
+                let sum = tempSet.reduce((s, t) => s + (t.j ? 10 : t.v), 0);
+                document.getElementById('status-msg').textContent = "סכום: " + sum + " (צריך 30)";
+            }
+            render();
+        }
+    }
+
+    function returnToHand(id) {
+        const idx = tempSet.findIndex(t => t.id === id);
+        if(idx !== -1) {
+            playerHand.push(tempSet.splice(idx, 1)[0]);
+            render();
+        }
+    }
+
+    function drawTile() {
+        if(pool.length > 0 && !hasDrawnThisTurn) {
+            playerHand.push(pool.pop());
+            hasDrawnThisTurn = true;
+            setTimeout(() => endTurn(), 500);
+        }
+    }
+
+    function endTurn() {
+        if(tempSet.length > 0) {
+            if(!hasMadeFirstMove) {
+                let sum = tempSet.reduce((s, t) => s + (t.j ? 10 : t.v), 0);
+                if(sum < 30) {
+                    alert("חובה להוריד לפחות 30 נקודות בפעם הראשונה!");
+                    playerHand.push(...tempSet);
+                    tempSet = [];
+                    render();
+                    return;
+                }
+                hasMadeFirstMove = true;
+            }
+            tableSets.push([...tempSet]);
+            tempSet = [];
+        }
+        document.getElementById('status-msg').textContent = "";
+        hasDrawnThisTurn = false;
+        timeLeft = 60;
+        if(pool.length > 0) compHand.push(pool.pop());
+        render();
+    }
+
+    function startTimer() {
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            const timerEl = document.getElementById('timer');
+            if (timerEl) {
+                timerEl.textContent = timeLeft;
+                if(timeLeft <= 0) endTurn();
+            }
+        }, 1000);
+    }
+
+    function sortHand(mode) {
+        if(mode === 'value') {
+            playerHand.sort((a,b) => (a.j ? 99 : a.v) - (b.j ? 99 : b.v));
+        } else {
+            playerHand.sort((a,b) => a.c.localeCompare(b.c) || (a.j ? 99 : a.v) - (b.j ? 99 : b.v));
+        }
+        render();
+    }
+</script>
+</body>
+</html>
