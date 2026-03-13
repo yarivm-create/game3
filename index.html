@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>רמיקוב PRO - השופט החכם</title>
+    <title>רמיקוב PRO - גרסת הסאונד</title>
     <style>
         body { background: #0a0e14; color: white; font-family: sans-serif; text-align: center; margin: 0; overflow: hidden; }
         #overlay { position: fixed; inset: 0; background: #0a0e14; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
@@ -30,38 +30,39 @@
 
         #controls { background: #16213e; padding: 10px; display: flex; gap: 10px; justify-content: center; direction: rtl; }
         .btn { background: none; border: 1px solid #00e5ff; color: #00e5ff; padding: 8px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; }
-        .btn.danger { border-color: #ff4757; color: #ff4757; }
+        #mute-btn { font-size: 20px; }
         #msg-bar { background: #ff4757; color: white; font-size: 14px; padding: 12px; display: none; position: fixed; top: 65px; width: 100%; z-index: 50; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div id="overlay">
-    <h1 style="color: #00e5ff;">רמיקוב PRO - גרסת השופט</h1>
-    <button class="start-btn" onclick="initGame()">שחק עכשיו</button>
+    <h1 style="color: #00e5ff;">רמיקוב PRO</h1>
+    <button class="start-btn" onclick="initGame()">שחק עם צלילים 🔊</button>
 </div>
 
 <div id="game-layout">
     <div id="hud">
+        <button id="mute-btn" class="btn" onclick="toggleMute()">🔊</button>
         <div>קופה: <span id="pool-txt">0</span></div>
         <div id="timer" style="font-size: 24px; color: #00e5ff;">60</div>
         <div id="turn-txt">תורך</div>
         <div>קלפי מחשב: <span id="comp-txt">0</span></div>
     </div>
     
-    <div id="msg-bar">הודעה</div>
+    <div id="msg-bar"></div>
     <div id="table"></div>
 
     <div id="controls">
         <button class="btn" onclick="sortHand('value')">מספרים</button>
         <button class="btn" onclick="sortHand('color')">צבעים</button>
-        <button class="btn danger" onclick="rollbackTurn()" id="resetBtn">בטל מהלכים ↩</button>
-        <button class="btn" onclick="drawAndEnd()">משוך וסיים</button>
-        <button class="btn" onclick="validateAndFinish()" id="finishBtn" style="border-color:#f1c40f; color:#f1c40f;">אשר מהלך</button>
+        <button class="btn" style="border-color:#ff4757; color:#ff4757;" onclick="rollbackTurn()">בטל מהלך</button>
+        <button class="btn" onclick="drawAndEnd()">משוך אריח</button>
+        <button class="btn" onclick="validateAndFinish()" id="finishBtn" style="border-color:#f1c40f; color:#f1c40f;">אשר</button>
     </div>
 
     <div id="player-hand">
-        <div id="lock" class="turn-lock">השופט בודק... ⚖️</div>
+        <div id="lock" class="turn-lock">המחשב חושב... 💻</div>
         <div id="hand-content"></div>
     </div>
 </div>
@@ -70,14 +71,55 @@
     let pool = [], playerHand = [], compHand = [], tableSets = [], currentTurnSets = [[]];
     let backupTable = [], backupHand = [];
     let hasMadeFirstMove = false, currentTurn = 'player', timeLeft = 60, timerInterval;
+    let isMuted = false;
 
+    // --- מערכת צלילים (Web Audio API) ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    function playSound(type) {
+        if (isMuted) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === 'click') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+        } else if (type === 'error') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+        } else if (type === 'win') {
+            const notes = [523, 659, 783, 1046];
+            notes.forEach((f, i) => {
+                const o = audioCtx.createOscillator();
+                const g = audioCtx.createGain();
+                o.connect(g); g.connect(audioCtx.destination);
+                o.frequency.setValueAtTime(f, audioCtx.currentTime + i*0.1);
+                g.gain.setValueAtTime(0.1, audioCtx.currentTime + i*0.1);
+                g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + i*0.1 + 0.4);
+                o.start(audioCtx.currentTime + i*0.1); o.stop(audioCtx.currentTime + i*0.1 + 0.4);
+            });
+        }
+    }
+
+    function toggleMute() {
+        isMuted = !isMuted;
+        document.getElementById('mute-btn').textContent = isMuted ? '🔇' : '🔊';
+    }
+
+    // --- לוגיקת משחק ---
     function initGame() {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
         document.getElementById('overlay').style.display = 'none';
         document.getElementById('game-layout').style.display = 'flex';
-        setupDeck();
-        saveBackup();
-        render();
-        startTimer();
+        setupDeck(); saveBackup(); render(); startTimer();
     }
 
     function setupDeck() {
@@ -92,41 +134,129 @@
         compHand = pool.splice(0, 14);
     }
 
-    function saveBackup() {
-        backupTable = JSON.parse(JSON.stringify(tableSets));
-        backupHand = JSON.parse(JSON.stringify(playerHand));
-    }
-
-    function rollbackTurn() {
-        tableSets = JSON.parse(JSON.stringify(backupTable));
-        playerHand = JSON.parse(JSON.stringify(backupHand));
-        currentTurnSets = [[]];
-        render();
-    }
-
-    // --- ליבת הבדיקה: האם סדרה חוקית? ---
     function isSetValid(set) {
         if (set.length < 3) return false;
-        
-        // הפרדת ג'וקרים
-        const jokers = set.filter(t => t.j);
         const normals = set.filter(t => !t.j);
-
-        if (normals.length === 0) return true; // רק ג'וקרים (לא סביר אבל חוקי)
-
-        // בדיקה 1: האם זו קבוצה (אותו מספר, צבעים שונים)?
+        const jokers = set.filter(t => t.j);
+        if (normals.length === 0) return true;
         const sameValue = normals.every(t => t.v === normals[0].v);
         if (sameValue) {
-            const usedColors = normals.map(t => t.c);
-            const uniqueColors = new Set(usedColors);
-            return uniqueColors.size === usedColors.length && set.length <= 4;
+            const uniqueColors = new Set(normals.map(t => t.c));
+            return uniqueColors.size === normals.length && set.length <= 4;
         }
-
-        // בדיקה 2: האם זו סדרה עולה (אותו צבע, מספרים עוקבים)?
         const sameColor = normals.every(t => t.c === normals[0].c);
         if (sameColor) {
-            const sorted = [...set].sort((a, b) => (a.j ? 0 : a.v) - (b.j ? 0 : b.v));
-            // בדיקה מורכבת שמתחשבת בג'וקרים כממלאי מקום
+            let sortedN = normals.sort((a,b) => a.v - b.v);
             let gaps = 0;
-            let sortedNormals = normals.sort((a,b) => a.v - b.v);
-            for(let i=0; i < sortedNormals.length -
+            for(let i=0; i<sortedN.length-1; i++) {
+                let d = sortedN[i+1].v - sortedN[i].v;
+                if(d === 0) return false;
+                gaps += (d - 1);
+            }
+            return gaps <= jokers.length;
+        }
+        return false;
+    }
+
+    function render() {
+        const table = document.getElementById('table');
+        table.innerHTML = '';
+        tableSets.forEach((set, sIdx) => {
+            const div = document.createElement('div');
+            div.className = 'set-box';
+            set.sort((a,b) => (a.j?0:a.v)-(b.j?0:b.v)).forEach((t, tIdx) => {
+                const el = createTile(t);
+                el.onclick = () => {
+                    playSound('click');
+                    currentTurnSets[currentTurnSets.length-1].push(set.splice(tIdx, 1)[0]);
+                    if(set.length === 0) tableSets.splice(sIdx, 1);
+                    render();
+                };
+                div.appendChild(el);
+            });
+            table.appendChild(div);
+        });
+
+        currentTurnSets.forEach((set, sIdx) => {
+            const div = document.createElement('div');
+            div.className = 'set-box new-set-area';
+            set.sort((a,b) => (a.j?0:a.v)-(b.j?0:b.v)).forEach((t, tIdx) => {
+                const el = createTile(t);
+                el.onclick = () => { playSound('click'); playerHand.push(set.splice(tIdx, 1)[0]); render(); };
+                div.appendChild(el);
+            });
+            table.appendChild(div);
+        });
+
+        const hand = document.getElementById('hand-content');
+        hand.innerHTML = '';
+        playerHand.forEach(t => {
+            const el = createTile(t);
+            el.onclick = () => {
+                playSound('click');
+                currentTurnSets[currentTurnSets.length-1].push(t);
+                playerHand = playerHand.filter(x => x.id !== t.id);
+                render();
+            };
+            hand.appendChild(el);
+        });
+        document.getElementById('pool-txt').textContent = pool.length;
+        document.getElementById('comp-txt').textContent = compHand.length;
+        document.getElementById('lock').style.display = currentTurn === 'comp' ? 'flex' : 'none';
+    }
+
+    function createTile(t) {
+        const el = document.createElement('div');
+        el.className = 'tile' + (t.j ? ' joker' : '');
+        el.style.color = t.c;
+        el.textContent = t.j ? '☺' : t.v;
+        return el;
+    }
+
+    function validateAndFinish() {
+        let active = currentTurnSets.filter(s => s.length > 0);
+        let all = [...tableSets, ...active];
+        if(!hasMadeFirstMove) {
+            let sum = active.reduce((a, s) => a + s.reduce((b, t) => b + (t.j?10:t.v), 0), 0);
+            if(sum < 30) { playSound('error'); showError("פתיחה דורשת 30 נקודות!"); return; }
+        }
+        for(let s of all) { if(!isSetValid(s)) { playSound('error'); showError("שולחן לא חוקי!"); return; } }
+        hasMadeFirstMove = true; tableSets = all; currentTurnSets = [[]]; saveBackup();
+        if(playerHand.length === 0) { playSound('win'); alert("ניצחת!"); location.reload(); }
+        else startCompTurn();
+    }
+
+    function startCompTurn() {
+        currentTurn = 'comp'; render();
+        setTimeout(() => {
+            if (pool.length > 0) compHand.push(pool.pop());
+            currentTurn = 'player'; timeLeft = 60; saveBackup(); render();
+        }, 1200);
+    }
+
+    function drawAndEnd() {
+        rollbackTurn();
+        if (pool.length > 0) pool.length > 0 && playerHand.push(pool.pop());
+        saveBackup(); startCompTurn();
+    }
+
+    function saveBackup() { backupTable = JSON.parse(JSON.stringify(tableSets)); backupHand = JSON.parse(JSON.stringify(playerHand)); }
+    function rollbackTurn() { tableSets = JSON.parse(JSON.stringify(backupTable)); playerHand = JSON.parse(JSON.stringify(backupHand)); currentTurnSets = [[]]; render(); }
+    function showError(msg) { const b = document.getElementById('msg-bar'); b.textContent = msg; b.style.display = 'block'; setTimeout(() => b.style.display = 'none', 3000); }
+    function sortHand(mode) {
+        if(mode === 'value') playerHand.sort((a,b) => (a.j?99:a.v) - (b.j?99:b.v) || a.c.localeCompare(b.c));
+        else playerHand.sort((a,b) => a.c.localeCompare(b.c) || (a.j?99:a.v) - (b.j?99:b.v));
+        render();
+    }
+    function startTimer() {
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            if(currentTurn === 'player') {
+                timeLeft--; document.getElementById('timer').textContent = timeLeft;
+                if(timeLeft <= 0) { playSound('error'); drawAndEnd(); }
+            }
+        }, 1000);
+    }
+</script>
+</body>
+</html>
