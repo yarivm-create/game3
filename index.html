@@ -2,217 +2,49 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>רמיקוב טקטי - גרסה יציבה</title>
-    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700&display=swap" rel="stylesheet">
+    <title>רמיקוב טקטי - משימת זמן</title>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
     <style>
-        :root { --bg: #1a1a2e; --panel: #16213e; --text: #e94560; --tile-bg: #fffbe0; --tile-border: #d4a373; }
+        :root { --bg: #0a0e14; --panel: #16213e; --text: #00e5ff; --tile-bg: #fffbe0; --tile-border: #d4a373; --danger: #ff4757; }
         body { margin: 0; background: var(--bg); color: #fff; font-family: 'Assistant', sans-serif; overflow: hidden; user-select: none; }
         
         #game-layout { display: flex; flex-direction: column; height: 100vh; }
-        #hud { height: 60px; background: rgba(0,0,0,0.5); display: flex; justify-content: space-around; align-items: center; border-bottom: 2px solid var(--text); }
+        #hud { height: 70px; background: rgba(0,0,0,0.8); display: flex; justify-content: space-around; align-items: center; border-bottom: 2px solid var(--text); }
         .stat { font-size: 18px; font-weight: bold; }
-
-        #table { flex-grow: 1; background: radial-gradient(circle, #2a2a4e 0%, #1a1a2e 100%); padding: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-content: flex-start; overflow-y: auto; }
-        .set { border: 2px dashed rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; display: flex; gap: 5px; min-width: 100px; min-height: 80px; transition: 0.3s; }
-        #temp-set { border: 2px solid var(--text); background: rgba(233, 69, 96, 0.05); }
-
-        #player-hand-container { height: 180px; background: var(--panel); padding: 15px; border-top: 2px solid #0f3460; }
-        #player-hand { display: flex; gap: 8px; overflow-x: auto; height: 100px; align-items: center; padding: 10px; }
         
-        .tile { width: 45px; height: 65px; background: var(--tile-bg); border: 2px solid var(--tile-border); border-radius: 5px; color: #000; display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; cursor: grab; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); }
+        /* עיצוב הטיימר */
+        #timer-container { display: flex; flex-direction: column; align-items: center; min-width: 100px; }
+        #timer { font-family: 'JetBrains Mono'; font-size: 28px; color: var(--text); transition: 0.3s; }
+        .low-time { color: var(--danger) !important; animation: blink 0.5s infinite; text-shadow: 0 0 10px var(--danger); }
+        @keyframes blink { 50% { opacity: 0.3; } }
+
+        #table { flex-grow: 1; background: radial-gradient(circle, #1a2a3a 0%, #0a0e14 100%); padding: 25px; display: flex; flex-wrap: wrap; gap: 20px; align-content: flex-start; overflow-y: auto; }
+        .set { border: 2px dashed rgba(255,255,255,0.1); padding: 12px; border-radius: 8px; display: flex; gap: 6px; min-width: 120px; min-height: 90px; background: rgba(255,255,255,0.02); }
+        #temp-set { border: 2px solid #f1c40f; background: rgba(241, 196, 15, 0.1); }
+
+        #player-hand-container { height: 190px; background: var(--panel); padding: 15px; border-top: 2px solid var(--text); }
+        #player-hand { display: flex; gap: 10px; overflow-x: auto; height: 110px; align-items: center; padding: 10px; }
         
-        #controls { margin-top: 10px; display: flex; gap: 10px; }
-        .btn { background: transparent; border: 2px solid var(--text); color: var(--text); padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .btn:hover:not(:disabled) { background: var(--text); color: #fff; }
-        .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .tile { width: 48px; height: 70px; background: var(--tile-bg); border: 2px solid var(--tile-border); border-radius: 6px; color: #000; display: flex; justify-content: center; align-items: center; font-size: 26px; font-weight: 800; cursor: grab; box-shadow: 3px 3px 6px rgba(0,0,0,0.4); }
+        .tile.joker { background: #f1c40f; border-color: #d4ac0d; color: #fff !important; }
+        
+        #controls { margin-top: 12px; display: flex; gap: 12px; justify-content: center; }
+        .btn { background: transparent; border: 2px solid var(--text); color: var(--text); padding: 8px 18px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn:hover:not(:disabled) { background: var(--text); color: #000; }
+        .btn:disabled { opacity: 0.2; cursor: not-allowed; }
 
         #overlay { position: absolute; inset: 0; background: var(--bg); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .start-btn { background: none; border: 3px solid var(--text); color: var(--text); padding: 15px 40px; font-size: 24px; cursor: pointer; }
+        .start-btn { background: none; border: 3px solid var(--text); color: var(--text); padding: 15px 50px; font-size: 26px; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div id="overlay">
-    <h1 style="font-size: 50px; color: var(--text);">רמיקוב אונליין</h1>
+    <h1 style="font-size: 55px; color: var(--text);">רמיקוב: מבצע 60 שניות</h1>
     <button class="start-btn" id="btnStart">התחל משחק</button>
 </div>
 
 <div id="game-layout">
     <div id="hud">
         <div class="stat">קופה: <span id="pool-count">0</span></div>
-        <div class="stat" id="turn-text">תור השחקן</div>
-        <div class="stat">מחשב: <span id="comp-count">0</span></div>
-    </div>
-
-    <div id="table"></div>
-
-    <div id="player-hand-container">
-        <div id="player-hand"></div>
-        <div id="controls">
-            <button class="btn" onclick="game.sortHand('value')">סדר לפי מספר</button>
-            <button class="btn" onclick="game.sortHand('color')">סדר לפי צבע</button>
-            <button class="btn" id="btnFinish" onclick="game.finishTurn()" disabled>אשר מהלך</button>
-            <button class="btn" id="btnDraw" onclick="game.playerDraw()">קח אריח</button>
-        </div>
-    </div>
-</div>
-
-<script>
-    class Tile {
-        constructor(value, color, id) {
-            this.value = value;
-            this.color = color;
-            this.id = id;
-            this.isJoker = (value === 0);
-        }
-        render() {
-            const el = document.createElement('div');
-            el.className = 'tile';
-            el.style.color = this.color;
-            el.textContent = this.isJoker ? '☺' : this.value;
-            el.dataset.id = this.id;
-            el.draggable = true;
-            return el;
-        }
-    }
-
-    class Rummikub {
-        constructor() {
-            this.colors = ['#e94560', '#00e5ff', '#ffffff', '#ffeb3b'];
-            this.pool = [];
-            this.playerHand = [];
-            this.compHand = [];
-            this.tableSets = [];
-            this.tempSet = [];
-            this.turn = 'player';
-            this.hasDrawn = false;
-        }
-
-        init() {
-            let id = 0;
-            for (let i = 0; i < 2; i++) {
-                this.colors.forEach(c => {
-                    for (let v = 1; v <= 13; v++) this.pool.push(new Tile(v, c, id++));
-                });
-            }
-            this.pool.push(new Tile(0, '#fff', id++));
-            this.pool.push(new Tile(0, '#ffeb3b', id++));
-            this.shuffle(this.pool);
-            for (let i = 0; i < 14; i++) {
-                this.playerHand.push(this.pool.pop());
-                this.compHand.push(this.pool.pop());
-            }
-            this.updateUI();
-            this.setupEvents();
-        }
-
-        shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } }
-
-        updateUI() {
-            const hand = document.getElementById('player-hand');
-            hand.innerHTML = '';
-            this.playerHand.forEach(t => hand.appendChild(t.render()));
-            
-            document.getElementById('pool-count').textContent = this.pool.length;
-            document.getElementById('comp-count').textContent = this.compHand.length;
-            document.getElementById('turn-text').textContent = this.turn === 'player' ? 'תור השחקן' : 'תור המחשב';
-            document.getElementById('btnFinish').disabled = (this.tempSet.length === 0);
-            document.getElementById('btnDraw').disabled = (this.hasDrawn || this.tempSet.length > 0);
-            this.renderTable();
-        }
-
-        renderTable() {
-            const table = document.getElementById('table');
-            table.innerHTML = '';
-            this.tableSets.forEach(s => {
-                const setEl = document.createElement('div');
-                setEl.className = 'set';
-                s.forEach(t => setEl.appendChild(t.render()));
-                table.appendChild(setEl);
-            });
-            if(this.tempSet.length > 0) {
-                const tempEl = document.createElement('div');
-                tempEl.className = 'set';
-                tempEl.id = 'temp-set';
-                this.tempSet.forEach(t => tempEl.appendChild(t.render()));
-                table.appendChild(tempEl);
-            }
-        }
-
-        setupEvents() {
-            document.getElementById('player-hand').addEventListener('dragstart', e => {
-                e.dataTransfer.setData('id', e.target.dataset.id);
-            });
-            const table = document.getElementById('table');
-            table.addEventListener('dragover', e => e.preventDefault());
-            table.addEventListener('drop', e => {
-                const id = parseInt(e.dataTransfer.getData('id'));
-                const idx = this.playerHand.findIndex(t => t.id === id);
-                if(idx !== -1) {
-                    this.tempSet.push(this.playerHand.splice(idx, 1)[0]);
-                    this.updateUI();
-                }
-            });
-        }
-
-        playerDraw() {
-            if(this.pool.length > 0) {
-                this.playerHand.push(this.pool.pop());
-                this.hasDrawn = true;
-                this.updateUI();
-                setTimeout(() => this.finishTurn(), 500);
-            }
-        }
-
-        finishTurn() {
-            if(this.tempSet.length > 0) {
-                if(this.isValid(this.tempSet)) {
-                    this.tableSets.push([...this.tempSet]);
-                    this.tempSet = [];
-                } else {
-                    alert('מהלך לא חוקי!');
-                    this.playerHand.push(...this.tempSet);
-                    this.tempSet = [];
-                }
-            }
-            this.turn = 'comp';
-            this.hasDrawn = false;
-            this.updateUI();
-            setTimeout(() => this.compAI(), 1000);
-        }
-
-        isValid(set) {
-            if(set.length < 3) return false;
-            const noJokers = set.filter(t => t.value !== 0);
-            const isGroup = noJokers.every(t => t.value === noJokers[0].value);
-            if(isGroup) return new Set(noJokers.map(t => t.color)).size === noJokers.length;
-            const isRun = noJokers.every(t => t.color === noJokers[0].color);
-            if(isRun) {
-                const vals = noJokers.map(t => t.value).sort((a,b)=>a-b);
-                for(let i=0; i<vals.length-1; i++) if(vals[i+1] - vals[i] === 0) return false;
-                return (vals[vals.length-1] - vals[0]) < set.length;
-            }
-            return false;
-        }
-
-        sortHand(mode) {
-            if(mode === 'value') this.playerHand.sort((a,b) => a.value - b.value || a.color.localeCompare(b.color));
-            else this.playerHand.sort((a,b) => a.color.localeCompare(b.color) || a.value - b.value);
-            this.updateUI();
-        }
-
-        compAI() {
-            if(this.pool.length > 0) this.compHand.push(this.pool.pop());
-            this.turn = 'player';
-            this.updateUI();
-        }
-    }
-
-    const game = new Rummikub();
-    document.getElementById('btnStart').onclick = () => {
-        document.getElementById('overlay').style.display = 'none';
-        game.init();
-    };
-</script>
-</body>
-</html>
+        <div id="timer-container">
