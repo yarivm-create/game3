@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>רמיקוב - אסטרטגיה טקטית</title>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg: #1a1a2e; --panel: #16213e; --text: #e94560; --tile-bg: #fffbe0; --tile-border: #d4a373; }
+        body { margin: 0; background: var(--bg); color: #fff; font-family: 'Assistant', sans-serif; overflow: hidden; user-select: none; }
+        
+        #game-layout { display: flex; flex-direction: column; height: 100vh; }
+        
+        /* HUD עליון */
+        #hud { height: 60px; background: rgba(0,0,0,0.5); display: flex; justify-content: space-around; align-items: center; border-bottom: 2px solid var(--text); z-index: 10; }
+        .stat { font-size: 18px; font-weight: bold; }
+        .turn-indicator { color: var(--text); text-transform: uppercase; letter-spacing: 2px; }
+
+        /* שולחן משותף */
+        #table { flex-grow: 1; background: radial-gradient(circle, #2a2a4e 0%, #1a1a2e 100%); padding: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-content: flex-start; overflow-y: auto; border-bottom: 2px solid var(--text); }
+        .set { border: 1px dashed rgba(255,255,255,0.2); padding: 10px; border-radius: 8px; display: flex; gap: 5px; min-width: 100px; min-height: 60px; }
+
+        /* יד השחקן */
+        #player-hand-container { height: 180px; background: var(--panel); padding: 15px; position: relative; }
+        #player-hand { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; height: 120px; align-items: center; }
+        
+        /* עיצוב אריח */
+        .tile { width: 45px; height: 65px; background: var(--tile-bg); border: 2px solid var(--tile-border); border-radius: 5px; color: #000; display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; cursor: grab; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); transition: transform 0.2s; position: relative; }
+        .tile:active { cursor: grabbing; transform: scale(1.1); z-index: 100; }
+        .tile.dragging { opacity: 0.5; }
+
+        /* כפתורים */
+        #controls { position: absolute; bottom: 15px; left: 20px; display: flex; gap: 10px; z-index: 10; }
+        .btn { background: transparent; border: 2px solid var(--text); color: var(--text); padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.3s; text-transform: uppercase; }
+        .btn:hover:not(:disabled) { background: var(--text); color: #fff; box-shadow: 0 0 15px var(--text); }
+        .btn:disabled { opacity: 0.3; cursor: not-allowed; border-color: #555; color: #555; }
+
+        /* מסך פתיחה */
+        #overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.9); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.5s; }
+        .start-btn { background: none; border: 3px solid var(--text); color: var(--text); padding: 20px 60px; font-size: 28px; font-weight: bold; cursor: pointer; text-transform: uppercase; letter-spacing: 5px; transition: 0.3s; }
+        .start-btn:hover { background: var(--text); color: #fff; box-shadow: 0 0 30px var(--text); }
+    </style>
+</head>
+<body>
+
+<div id="overlay">
+    <h1 style="font-size: 60px; color: var(--text); margin-bottom: 10px; letter-spacing: -2px;">רמיקוב טקטי</h1>
+    <p style="color: #888; margin-bottom: 40px; font-size: 18px;">שחקן נגד המחשב</p>
+    <button class="start-btn" onclick="startGame()">התחל משחק</button>
+</div>
+
+<div id="game-layout">
+    <div id="hud">
+        <div class="stat">אריחים בקופה: <span id="pool-count">0</span></div>
+        <div class="stat turn-indicator" id="turn-text">תור השחקן</div>
+        <div class="stat">אריחים למחשב: <span id="comp-count">0</span></div>
+    </div>
+
+    <div id="table">
+        </div>
+
+    <div id="player-hand-container">
+        <div id="player-hand">
+            </div>
+        <div id="controls">
+            <button class="btn" id="sort-color-btn" onclick="game.sortHand('color')">סדר לפי צבע</button>
+            <button class="btn" id="sort-value-btn" onclick="game.sortHand('value')">סדר לפי מספר</button>
+            <button class="btn" id="finish-turn-btn" onclick="game.finishTurn()" disabled>סיים תור</button>
+            <button class="btn" id="draw-btn" onclick="game.playerDraw()">משוך אריח</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    class Tile {
+        constructor(value, color, id) {
+            this.value = value; // 1-13
+            this.color = color; // 'red', 'blue', 'black', 'yellow'
+            this.id = id;
+            this.isJoker = (value === 0);
+        }
+
+        render() {
+            const tileEl = document.createElement('div');
+            tileEl.className = 'tile';
+            tileEl.style.color = this.color;
+            tileEl.textContent = this.isJoker ? '☺' : this.value;
+            tileEl.dataset.id = this.id;
+            tileEl.draggable = true;
+            return tileEl;
+        }
+    }
+
+    class GameEngine {
+        constructor() {
+            this.colors = ['#e94560', '#00e5ff', '#fff', '#ffeb3b']; // Red, Blue, Black, Yellow
+            this.pool = [];
+            this.playerHand = [];
+            this.compHand = [];
+            this.tableSets = []; // Array of arrays (sets)
+            this.turn = 'player'; // 'player' or 'comp'
+            this.tempSet = []; // Tiles dragged to table but not validated
+            this.hasDrawn = false;
+        }
+
+        init() {
+            let idCounter = 0;
+            // יצירת קופה (2 סטים של 1-13 מכל צבע + 2 ג'וקרים)
+            for (let i = 0; i < 2; i++) {
+                this.colors.forEach(color => {
+                    for (let v = 1; v <= 13; v++) {
+                        this.pool.push(new Tile(v, color, idCounter++));
+                    }
+                });
+            }
+            // ג'וקרים
+            this.pool.push(new Tile(0, '#fff', idCounter++)); // Joker 1
+            this.pool.push(new Tile(0, '#ffeb3b', idCounter++)); // Joker 2
+
+            this.shuffle(this.pool);
+            this.deal();
+            this.renderHUD();
+            this.renderPlayerHand();
+            this.setupDragAndDrop();
+        }
+
+        shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        deal() {
+            // חלוקת 14 אריחים לכל אחד
+            for (let i = 0; i < 14; i++) {
+                this.playerHand.push(this.pool.pop());
+                this.compHand.push(this.pool.pop());
+            }
+        }
+
+        // אריזה מחדש של ה-UI
+        renderHUD() {
+            document.getElementById('pool-count').textContent = this.pool.length;
+            document.getElementById('comp-count').textContent = this.compHand.length;
+            const turnText = document.getElementById('turn-text');
+            turnText.textContent = this.turn === 'player' ? 'תור השחקן' : 'תור המחשב';
+            turnText.style.color = this.turn === 'player' ? '#fff' : '#888';
+            
+            // עדכון כפתורים
+            document.getElementById('draw-btn').disabled = (this.turn === 'comp' || this.hasDrawn || this.tempSet.length > 0);
+            document.getElementById('finish-turn-btn').disabled = (this.turn === 'comp' || this.tempSet.length === 0);
+        }
+
+        renderPlayerHand() {
+            const handEl = document.getElementById('player-hand');
+            handEl.innerHTML = '';
+            this.playerHand.forEach(tile => {
+                handEl.appendChild(tile.render());
+            });
+        }
+
+        renderTable() {
+            const tableEl = document.getElementById('table');
+            // ניקוי רק של סטים מאושרים
+            const approvedSets = tableEl.querySelectorAll('.set');
+            approvedSets.forEach(set => set.remove());
+
+            this.tableSets.forEach(set => {
+                const setEl = document.createElement('div');
+                setEl.className = 'set';
+                set.forEach(tile => setEl.appendChild(tile.render()));
+                tableEl.appendChild(setEl);
+            });
+        }
+
+        // סידור היד
+        sortHand(type) {
+            if (this.turn === 'comp') return;
+            if (type === 'color') {
+                this.playerHand.sort((a, b) => a.color.localeCompare(b.color) || a.value - b.value);
+            } else {
+                this.playerHand.sort((a, b) => a.value - b.value || a.color.localeCompare(b.color));
+            }
+            this.renderPlayerHand();
+        }
+
+        // לוגיקת גרירה ושחרור (Drag & Drop)
+        setupDragAndDrop() {
+            const handEl = document.getElementById('player-hand');
+            const tableEl = document.getElementById('table');
+
+            // גרירה מהיד
+            handEl.addEventListener('dragstart', (e) => {
+                if (this.turn === 'comp') return e.preventDefault();
+                e.target.classList.add('dragging');
+                e.dataTransfer.setData('text/plain', e.target.dataset.id);
+            });
+
+            handEl.addEventListener('dragend', (e) => e.target.classList.remove('dragging'));
+
+            // שחרור על השולחן
+            tableEl.addEventListener('dragover', (e) => e.preventDefault());
+            tableEl.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (this.turn === 'comp') return;
+                
+                const tileId = parseInt(e.dataTransfer.getData('text/plain'));
+                const tileIndex = this.playerHand.findIndex(t => t.id === tileId);
+                
+                if (tileIndex !== -1) {
+                    const tile = this.playerHand.splice(tileIndex, 1)[0];
+                    this.tempSet.push(tile); // הוספה לסט זמני
+                    this.renderPlayerHand();
+                    this.renderTempSet();
+                    this.renderHUD(); // עדכון כפתורים
+                }
+            });
+        }
+
+        renderTempSet() {
+            const tableEl = document.getElementById('table');
+            let tempSetEl = document.getElementById('temp-set');
+            if (!tempSetEl) {
+                tempSetEl = document.createElement('div');
+                tempSetEl.className = 'set';
+                tempSetEl.id = 'temp-set';
+                tempSetEl.style.borderColor = var('--text');
+                tableEl.appendChild(tempSetEl);
+            }
+            tempSetEl.innerHTML = ''; // ניקוי הסט הזמני הקיים
+            this.tempSet.forEach(tile => tempSetEl.appendChild(tile.render()));
+        }
+
+        // לוגיקת תורות
+        playerDraw() {
+            if (this.turn === 'comp' || this.hasDrawn || this.tempSet.length > 0) return;
+            if (this.pool.length > 0) {
+                this.playerHand.push(this.pool.pop());
+                this.hasDrawn = true;
+                this.renderPlayerHand();
+                this.renderHUD();
+                // משיכה מסיימת תור אוטומטית אם לא הורדנו כלום
+                setTimeout(() => this.finishTurn(), 1000);
+            }
+        }
+
+        finishTurn() {
+            if (this.turn === 'comp') return;
+
+            // אם השחקן ניסה להוריד משהו, ולידציה של הסט הזמני
+            if (this.tempSet.length > 0) {
+                if (this.isValidSet(this.tempSet)) {
+                    this.tableSets.push([...this.tempSet]); // אישור הסט
+                    this.tempSet = [];
+                    // ניקוי אלמנט הסט הזמני מה-DOM
+                    const tempSetEl = document.getElementById('temp-set');
+                    if(tempSetEl) tempSetEl.remove();
+                    this.renderTable();
+                    this.hasDrawn = false; // הורדה מבטלת את הצורך במשיכה
+                } else {
+                    // סט לא חוקי - החזרת האריחים ליד
+                    alert('מהלך לא חוקי! האריחים הוחזרו ליד שלך.');
+                    this.playerHand.push(...this.tempSet);
+                    this.tempSet = [];
+                    const tempSetEl = document.getElementById('temp-set');
+                    if(tempSetEl) tempSetEl.remove();
+                    this.renderPlayerHand();
+                }
+            }
+
+            this.turn = 'comp';
+            this.hasDrawn = false;
+            this.renderHUD();
+            this.checkWin();
+            setTimeout(() => this.compTurn(), 1500); // ביצוע תור מחשב
+        }
+
+        // ולידציה של סטים (סדרות וקבוצות)
+        isValidSet(set) {
+            if (set.length < 3) return false;
+            // ניקוי ג'וקרים לצורך הבדיקה הבסיסית
+            const cleanSet = set.filter(t => !t.isJoker);
+            const jokersCount = set.length - cleanSet.length;
+
+            if (cleanSet.length === 0) return true; // סט שכולו ג'וקרים (לא אמור לקרות)
+
+            // בדיקת קבוצה (Group - אותם מספרים, צבעים שונים)
+            const isGroup = cleanSet.every(t => t.value === cleanSet[0].value);
+            if (isGroup) {
+                const colors = new Set(cleanSet.map(t => t.color));
+                return colors.size === cleanSet.length && set.length <= 4;
+            }
+
+            // בדיקת סדרה (Run - אותו צבע, מספרים עוקבים)
+            const isRun = cleanSet.every(t => t.color === cleanSet[0].color);
+            if (isRun) {
+                const values = cleanSet.map(t => t.value).sort((a,b) => a-b);
+                // בדיקה אם יש רווחים שג'וקרים לא יכולים למלא
+                let gaps = 0;
+                for (let i = 0; i < values.length - 1; i++) {
+                    const gap = values[i+1] - values[i] - 1;
+                    if (gap < 0) return false; // מספרים זהים באותה סדרה
+                    gaps += gap;
+                }
+                return gaps <= jokersCount && set.length <= 13;
+            }
+            return false;
+        }
+
+        // בינה מלאכותית (AI) לתור המחשב
+        compTurn() {
+            if (this.turn === 'player') return;
+            console.log("Comp Turn Started");
+            let moved = false;
+            
+            // המחשב מנסה ליצור סטים פשוטים (האלגוריתם פה בסיסי ביותר)
+            this.compHand.sort((a,b) => a.value - b.value); // מיון בסיסי
+            
+            // ניסיון מציאת קבוצות (Groups)
+            for (let v = 1; v <= 13; v++) {
+                const matchingTiles = this.compHand.filter(t => t.value === v && !t.isJoker);
+                if (matchingTiles.length >= 3) {
+                    // בדיקת צבעים שונים
+                    const uniqueColors = [...new Set(matchingTiles.map(t => t.color))];
+                    if (uniqueColors.length >= 3) {
+                        const set = matchingTiles.slice(0, 3);
+                        this.tableSets.push(set);
+                        // הסרה מהיד
+                        this.compHand = this.compHand.filter(t => !set.includes(t));
+                        moved = true;
+                        break;
+                    }
+                }
+            }
+
+            if (moved) {
+                this.renderTable();
+            } else {
+                // משיכת אריח
+                if (this.pool.length > 0) {
+                    console.log("Comp draws a tile");
+                    this.compHand.push(this.pool.pop());
+                }
+            }
+
+            this.checkWin();
+            this.turn = 'player';
+            this.renderHUD();
+            console.log("Comp Turn Ended");
+        }
+
+        checkWin() {
+            if (this.playerHand.length === 0) {
+                alert('כל הכבוד! ניצחת את המחשב!');
+                location.reload();
+            } else if (this.compHand.length === 0) {
+                alert('המחשב ניצח! נסה שוב בפעם הבאה.');
+                location.reload();
+            }
+        }
+    }
+
+    const game = new GameEngine();
+
+    function startGame() {
+        document.getElementById('overlay').style.opacity = '0';
+        setTimeout(() => document.getElementById('overlay').style.display = 'none', 500);
+        game.init();
+    }
+</script>
+</body>
+</html>
