@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>רמיקוב ELITE - גרסה בינלאומית</title>
+    <title>רמיקוב ELITE - גרסה מלאה</title>
     <style>
         body { background: #0a0e14; color: white; font-family: sans-serif; text-align: center; margin: 0; overflow: hidden; }
         #overlay { position: fixed; inset: 0; background: #0a0e14; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
@@ -11,7 +11,6 @@
         #game-layout { display: none; flex-direction: column; height: 100vh; }
         #hud { height: 60px; background: #16213e; display: flex; justify-content: space-around; align-items: center; border-bottom: 2px solid #00e5ff; }
         
-        /* השולחן והיד מוצגים משמאל לימין עבור המספרים */
         #table { flex-grow: 1; padding: 20px; display: flex; flex-wrap: wrap; gap: 15px; overflow-y: auto; background: #0f172a; align-content: flex-start; direction: ltr; }
         #player-hand { height: 140px; background: #16213e; display: flex; padding: 15px; border-top: 2px solid #00e5ff; position: relative; direction: ltr; }
         #hand-content { display: flex; gap: 6px; overflow-x: auto; width: 100%; }
@@ -26,10 +25,12 @@
         .joker { background: #f1c40f !important; color: #fff !important; }
         
         .set-box { border: 2px solid rgba(255,255,255,0.1); padding: 8px; display: flex; gap: 4px; border-radius: 6px; background: rgba(255,255,255,0.05); }
-        .new-set-area { border: 2px dashed #00e5ff; min-width: 100px; padding: 5px; display: flex; gap: 4px; border-radius: 6px; }
+        .new-set-area { border: 2px dashed #00e5ff; min-width: 100px; padding: 5px; display: flex; gap: 4px; border-radius: 6px; position: relative; }
 
         #controls { background: #16213e; padding: 10px; display: flex; gap: 10px; justify-content: center; direction: rtl; }
         .btn { background: none; border: 1px solid #00e5ff; color: #00e5ff; padding: 8px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; }
+        .btn.danger { border-color: #ff4757; color: #ff4757; }
+        .btn.danger:hover { background: #ff4757; color: white; }
         .btn:disabled { opacity: 0.3; }
         #msg-bar { background: #ff4757; color: white; font-size: 14px; padding: 5px; display: none; position: fixed; top: 65px; width: 100%; z-index: 50; }
     </style>
@@ -38,7 +39,6 @@
 
 <div id="overlay">
     <h1 style="color: #00e5ff;">רמיקוב PRO</h1>
-    <p>גרסה 2.0 - מספרים משמאל לימין</p>
     <button class="start-btn" onclick="initGame()">התחל משחק</button>
 </div>
 
@@ -56,6 +56,7 @@
     <div id="controls">
         <button class="btn" onclick="sortHand('value')">סדר מספרים</button>
         <button class="btn" onclick="sortHand('color')">סדר צבעים</button>
+        <button class="btn danger" onclick="resetCurrentTurn()" id="resetBtn">נקה הכל ↩</button>
         <button class="btn" onclick="drawAndEnd()">דלג/משוך</button>
         <button class="btn" onclick="validateAndFinish()" id="finishBtn" style="border-color:#f1c40f; color:#f1c40f;">אשר מהלכים</button>
     </div>
@@ -97,6 +98,7 @@
         const table = document.getElementById('table');
         table.innerHTML = '';
         
+        // סדרות קבועות על השולחן
         tableSets.forEach(set => {
             const div = document.createElement('div');
             div.className = 'set-box';
@@ -104,6 +106,7 @@
             table.appendChild(div);
         });
 
+        // סדרות שהשחקן מוריד עכשיו
         if (currentTurn === 'player') {
             currentTurnSets.forEach((set, sIdx) => {
                 const div = document.createElement('div');
@@ -117,6 +120,7 @@
             });
             const btn = document.createElement('button');
             btn.className = 'btn'; btn.textContent = "+ סדרה";
+            btn.style.height = "40px";
             btn.onclick = () => { currentTurnSets.push([]); render(); };
             table.appendChild(btn);
         }
@@ -133,10 +137,21 @@
             hand.appendChild(el);
         });
 
+        // עדכון כפתור הניקוי
+        const hasTilesOnTable = currentTurnSets.some(s => s.length > 0);
+        document.getElementById('resetBtn').disabled = !hasTilesOnTable || currentTurn !== 'player';
+
         document.getElementById('pool-txt').textContent = pool.length;
         document.getElementById('comp-txt').textContent = compHand.length;
         document.getElementById('lock').style.display = currentTurn === 'comp' ? 'flex' : 'none';
-        document.getElementById('turn-txt').textContent = currentTurn === 'player' ? "תורך" : "תור המחשב";
+    }
+
+    function resetCurrentTurn() {
+        currentTurnSets.forEach(set => {
+            playerHand.push(...set);
+        });
+        currentTurnSets = [[]];
+        render();
     }
 
     function createTile(t) {
@@ -170,10 +185,9 @@
     function startCompTurn() {
         currentTurn = 'comp';
         render();
-        
         setTimeout(() => {
+            // לוגיקת מחשב בסיסית (כמו קודם)
             let moved = false;
-            // בינה מלאכותית: מחפש קבוצות (אותו מספר)
             let groups = {};
             compHand.forEach(t => { if(!t.j) { groups[t.v] = groups[t.v] || []; groups[t.v].push(t); } });
             for (let v in groups) {
@@ -181,45 +195,18 @@
                     let set = groups[v].splice(0, 3);
                     tableSets.push(set);
                     compHand = compHand.filter(t => !set.find(s => s.id === t.id));
-                    moved = true;
-                    break;
+                    moved = true; break;
                 }
             }
-            
-            // בינה מלאכותית: מחפש סדרות עולות (אותו צבע)
-            if (!moved) {
-                colors.forEach(color => {
-                    let sameColor = compHand.filter(t => t.c === color).sort((a,b) => a.v - b.v);
-                    let sequence = [];
-                    for(let i=0; i<sameColor.length; i++) {
-                        if(sequence.length === 0 || sameColor[i].v === sequence[sequence.length-1].v + 1) {
-                            sequence.push(sameColor[i]);
-                        } else if (sequence.length < 3) {
-                            sequence = [sameColor[i]];
-                        }
-                        if(sequence.length >= 3) {
-                            tableSets.push([...sequence]);
-                            compHand = compHand.filter(t => !sequence.find(s => s.id === t.id));
-                            moved = true;
-                            break;
-                        }
-                    }
-                });
-            }
-
             if (!moved && pool.length > 0) compHand.push(pool.pop());
-            
-            if (compHand.length === 0) { alert("המחשב ניצח!"); location.reload(); }
-            
             currentTurn = 'player';
             timeLeft = 60;
             render();
-        }, 2000);
+        }, 1500);
     }
 
     function drawAndEnd() {
-        currentTurnSets.forEach(s => playerHand.push(...s));
-        currentTurnSets = [[]];
+        resetCurrentTurn();
         if (pool.length > 0) playerHand.push(pool.pop());
         startCompTurn();
     }
