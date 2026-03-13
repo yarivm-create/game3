@@ -2,49 +2,64 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>רמיקוב טקטי - משימת זמן</title>
-    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+    <title>רמיקוב טקטי - גרסת תיקון סופית</title>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        :root { --bg: #0a0e14; --panel: #16213e; --text: #00e5ff; --tile-bg: #fffbe0; --tile-border: #d4a373; --danger: #ff4757; }
+        :root { --bg: #0a0e14; --panel: #16213e; --text: #00e5ff; --tile-bg: #fffbe0; --danger: #ff4757; }
         body { margin: 0; background: var(--bg); color: #fff; font-family: 'Assistant', sans-serif; overflow: hidden; user-select: none; }
-        
         #game-layout { display: flex; flex-direction: column; height: 100vh; }
         #hud { height: 70px; background: rgba(0,0,0,0.8); display: flex; justify-content: space-around; align-items: center; border-bottom: 2px solid var(--text); }
-        .stat { font-size: 18px; font-weight: bold; }
-        
-        /* עיצוב הטיימר */
-        #timer-container { display: flex; flex-direction: column; align-items: center; min-width: 100px; }
-        #timer { font-family: 'JetBrains Mono'; font-size: 28px; color: var(--text); transition: 0.3s; }
-        .low-time { color: var(--danger) !important; animation: blink 0.5s infinite; text-shadow: 0 0 10px var(--danger); }
+        #timer { font-size: 28px; color: var(--text); font-weight: bold; }
+        .low-time { color: var(--danger) !important; animation: blink 0.5s infinite; }
         @keyframes blink { 50% { opacity: 0.3; } }
-
-        #table { flex-grow: 1; background: radial-gradient(circle, #1a2a3a 0%, #0a0e14 100%); padding: 25px; display: flex; flex-wrap: wrap; gap: 20px; align-content: flex-start; overflow-y: auto; }
-        .set { border: 2px dashed rgba(255,255,255,0.1); padding: 12px; border-radius: 8px; display: flex; gap: 6px; min-width: 120px; min-height: 90px; background: rgba(255,255,255,0.02); }
-        #temp-set { border: 2px solid #f1c40f; background: rgba(241, 196, 15, 0.1); }
-
+        #table { flex-grow: 1; background: radial-gradient(circle, #1a2a3a 0%, #0a0e14 100%); padding: 25px; display: flex; flex-wrap: wrap; gap: 15px; overflow-y: auto; }
+        .set { border: 2px dashed rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; display: flex; gap: 5px; min-width: 100px; min-height: 80px; }
         #player-hand-container { height: 190px; background: var(--panel); padding: 15px; border-top: 2px solid var(--text); }
-        #player-hand { display: flex; gap: 10px; overflow-x: auto; height: 110px; align-items: center; padding: 10px; }
-        
-        .tile { width: 48px; height: 70px; background: var(--tile-bg); border: 2px solid var(--tile-border); border-radius: 6px; color: #000; display: flex; justify-content: center; align-items: center; font-size: 26px; font-weight: 800; cursor: grab; box-shadow: 3px 3px 6px rgba(0,0,0,0.4); }
-        .tile.joker { background: #f1c40f; border-color: #d4ac0d; color: #fff !important; }
-        
-        #controls { margin-top: 12px; display: flex; gap: 12px; justify-content: center; }
-        .btn { background: transparent; border: 2px solid var(--text); color: var(--text); padding: 8px 18px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        #player-hand { display: flex; gap: 8px; overflow-x: auto; height: 100px; align-items: center; }
+        .tile { width: 45px; height: 65px; background: var(--tile-bg); border: 2px solid #d4a373; border-radius: 5px; color: #000; display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; cursor: grab; }
+        .tile.joker { background: #f1c40f; color: #fff !important; }
+        #controls { margin-top: 10px; display: flex; gap: 10px; justify-content: center; }
+        .btn { background: transparent; border: 2px solid var(--text); color: var(--text); padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .btn:hover:not(:disabled) { background: var(--text); color: #000; }
-        .btn:disabled { opacity: 0.2; cursor: not-allowed; }
-
-        #overlay { position: absolute; inset: 0; background: var(--bg); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .start-btn { background: none; border: 3px solid var(--text); color: var(--text); padding: 15px 50px; font-size: 26px; cursor: pointer; }
+        .btn:disabled { opacity: 0.2; }
+        #overlay { position: absolute; inset: 0; background: var(--bg); z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .start-btn { background: none; border: 3px solid var(--text); color: var(--text); padding: 15px 50px; font-size: 24px; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div id="overlay">
-    <h1 style="font-size: 55px; color: var(--text);">רמיקוב: מבצע 60 שניות</h1>
-    <button class="start-btn" id="btnStart">התחל משחק</button>
+    <h1 style="font-size: 40px; color: var(--text);">רמיקוב טקטי</h1>
+    <button class="start-btn" id="realStartBtn">התחל משחק</button>
 </div>
 
 <div id="game-layout">
     <div id="hud">
         <div class="stat">קופה: <span id="pool-count">0</span></div>
-        <div id="timer-container">
+        <div id="timer">60</div>
+        <div class="stat">מחשב: <span id="comp-count">0</span></div>
+    </div>
+    <div id="table"></div>
+    <div id="player-hand-container">
+        <div id="player-hand"></div>
+        <div id="controls">
+            <button class="btn" id="sortVal">סדר מספרים</button>
+            <button class="btn" id="sortCol">סדר צבעים</button>
+            <button class="btn" id="btnFinish" disabled>אשר מהלך</button>
+            <button class="btn" id="btnDraw">קח אריח</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// אתחול משתנים בסיסיים מיד עם טעינת הדף
+const colors = ['#e94560', '#00e5ff', '#2c3e50', '#f1c40f'];
+let pool = [], playerHand = [], compHand = [], tableSets = [], tempSet = [];
+let turn = 'player', hasDrawn = false, timeLeft = 60, timerInterval;
+
+function createDeck() {
+    pool = [];
+    let id = 0;
+    for (let i = 0; i < 2; i++) {
+        colors.forEach(c => {
+            for (let
