@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>רמיקוב - שולחן פתוח</title>
+    <title>רמיקוב PRO - חוקים סופיים</title>
     <style>
         body { background: #0a0e14; color: white; font-family: sans-serif; text-align: center; margin: 0; overflow: hidden; }
         #overlay { position: fixed; inset: 0; background: #0a0e14; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
@@ -21,25 +21,25 @@
             width: 40px; height: 58px; background: #fffbe0; border: 2px solid #d4a373; border-radius: 5px; 
             color: black; display: flex; justify-content: center; align-items: center; 
             font-size: 20px; font-weight: 800; cursor: pointer; flex-shrink: 0; box-shadow: 2px 2px 4px rgba(0,0,0,0.4);
-            user-select: none;
+            user-select: none; transition: transform 0.1s;
         }
+        .tile:active { transform: scale(0.9); }
         .joker { background: #f1c40f !important; color: #fff !important; }
         
-        .set-box { border: 2px solid rgba(255,255,255,0.1); padding: 8px; display: flex; gap: 4px; border-radius: 6px; background: rgba(255,255,255,0.05); }
+        .set-box { border: 2px solid rgba(255,255,255,0.1); padding: 8px; display: flex; gap: 4px; border-radius: 6px; background: rgba(255,255,255,0.05); min-height: 60px; }
         .new-set-area { border: 2px dashed #00e5ff !important; min-width: 80px; }
 
         #controls { background: #16213e; padding: 10px; display: flex; gap: 10px; justify-content: center; direction: rtl; }
         .btn { background: none; border: 1px solid #00e5ff; color: #00e5ff; padding: 8px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; }
         .btn.danger { border-color: #ff4757; color: #ff4757; }
-        #msg-bar { background: #ff4757; color: white; font-size: 14px; padding: 5px; display: none; position: fixed; top: 65px; width: 100%; z-index: 50; }
+        #msg-bar { background: #ff4757; color: white; font-size: 14px; padding: 8px; display: none; position: fixed; top: 65px; width: 100%; z-index: 50; }
     </style>
 </head>
 <body>
 
 <div id="overlay">
-    <h1 style="color: #00e5ff;">רמיקוב PRO</h1>
-    <p>חוקי שולחן פתוח: מותר לפרק ולסדר מחדש</p>
-    <button class="start-btn" onclick="initGame()">התחל משחק</button>
+    <h1 style="color: #00e5ff;">רמיקוב - חוקי הברזל</h1>
+    <button class="start-btn" onclick="initGame()">שחק</button>
 </div>
 
 <div id="game-layout">
@@ -50,14 +50,14 @@
         <div>קלפי מחשב: <span id="comp-txt">0</span></div>
     </div>
     
-    <div id="msg-bar"></div>
+    <div id="msg-bar">הודעת שגיאה</div>
     <div id="table"></div>
 
     <div id="controls">
         <button class="btn" onclick="sortHand('value')">מספרים</button>
         <button class="btn" onclick="sortHand('color')">צבעים</button>
-        <button class="btn danger" onclick="rollbackTurn()" id="resetBtn">בטל הכל ↩</button>
-        <button class="btn" onclick="drawAndEnd()">משוך וסיים</button>
+        <button class="btn danger" onclick="rollbackTurn()" id="resetBtn">נקה ↩</button>
+        <button class="btn" onclick="drawAndEnd()">משוך אריח</button>
         <button class="btn" onclick="validateAndFinish()" id="finishBtn" style="border-color:#f1c40f; color:#f1c40f;">אשר מהלך</button>
     </div>
 
@@ -69,9 +69,8 @@
 
 <script>
     let pool = [], playerHand = [], compHand = [], tableSets = [], currentTurnSets = [[]];
-    let backupTable = [], backupHand = []; // לביטול מהלך
-    let hasMadeFirstMove = false, compHasMadeFirstMove = false;
-    let currentTurn = 'player', timeLeft = 60, timerInterval;
+    let backupTable = [], backupHand = [];
+    let hasMadeFirstMove = false, currentTurn = 'player', timeLeft = 60, timerInterval;
 
     function initGame() {
         document.getElementById('overlay').style.display = 'none';
@@ -110,27 +109,22 @@
         const table = document.getElementById('table');
         table.innerHTML = '';
 
-        // סדרות על השולחן (ניתנות למשיכה רק אם השחקן כבר פתח 30)
         tableSets.forEach((set, sIdx) => {
             const div = document.createElement('div');
             div.className = 'set-box';
             set.forEach((t, tIdx) => {
                 const el = createTile(t);
                 el.onclick = () => {
-                    if(hasMadeFirstMove) {
-                        currentTurnSets[currentTurnSets.length-1].push(set.splice(tIdx, 1)[0]);
-                        if(set.length === 0) tableSets.splice(sIdx, 1);
-                        render();
-                    } else {
-                        showError("חייב להוריד 30 מהיד לפני נגיעה בשולחן!");
-                    }
+                    if(currentTurn !== 'player') return;
+                    currentTurnSets[currentTurnSets.length-1].push(set.splice(tIdx, 1)[0]);
+                    if(set.length === 0) tableSets.splice(sIdx, 1);
+                    render();
                 };
                 div.appendChild(el);
             });
             table.appendChild(div);
         });
 
-        // אזור העבודה של השחקן
         if (currentTurn === 'player') {
             currentTurnSets.forEach((set, sIdx) => {
                 const div = document.createElement('div');
@@ -146,7 +140,7 @@
                 table.appendChild(div);
             });
             const addSet = document.createElement('button');
-            addSet.className = 'btn'; addSet.textContent = "+ סדרה";
+            addSet.className = 'btn'; addSet.textContent = "+";
             addSet.onclick = () => { currentTurnSets.push([]); render(); };
             table.appendChild(addSet);
         }
@@ -156,6 +150,7 @@
         playerHand.forEach(t => {
             const el = createTile(t);
             el.onclick = () => {
+                if(currentTurn !== 'player') return;
                 currentTurnSets[currentTurnSets.length-1].push(t);
                 playerHand = playerHand.filter(x => x.id !== t.id);
                 render();
@@ -166,6 +161,10 @@
         document.getElementById('pool-txt').textContent = pool.length;
         document.getElementById('comp-txt').textContent = compHand.length;
         document.getElementById('lock').style.display = currentTurn === 'comp' ? 'flex' : 'none';
+        
+        // כפתור אישור פעיל רק אם בוצע שינוי
+        const changed = JSON.stringify(playerHand) !== JSON.stringify(backupHand) || currentTurnSets.some(s => s.length > 0);
+        document.getElementById('finishBtn').disabled = !changed;
     }
 
     function createTile(t) {
@@ -180,16 +179,22 @@
         let activeSets = currentTurnSets.filter(s => s.length > 0);
         let allSets = [...tableSets, ...activeSets];
         
+        // בדיקת שינוי מינימלי
+        if (JSON.stringify(playerHand) === JSON.stringify(backupHand) && activeSets.length === 0) {
+            showError("לא בוצע מהלך. משוך אריח כדי לסיים.");
+            return;
+        }
+
         // בדיקת חוק ה-30
         if(!hasMadeFirstMove) {
             let sum = activeSets.reduce((a, s) => a + s.reduce((b, t) => b + (t.j?10:t.v), 0), 0);
-            if(sum < 30) { showError("פתיחה דורשת 30 נקודות!"); return; }
+            if(sum < 30) { showError("פתיחה דורשת 30 נקודות מהיד!"); return; }
             hasMadeFirstMove = true;
         }
 
-        // בדיקה שכל הסדרות על השולחן חוקיות (לפחות 3 אריחים)
+        // בדיקת חוקיות השולחן
         for(let s of allSets) {
-            if(s.length < 3) { showError("כל סדרה על השולחן חייבת להיות לפחות 3 אריחים!"); return; }
+            if(s.length < 3) { showError("שולחן לא תקין: כל סדרה חייבת 3 אריחים!"); return; }
         }
 
         tableSets = allSets;
@@ -202,9 +207,10 @@
     function startCompTurn() {
         currentTurn = 'comp'; render();
         setTimeout(() => {
-            // לוגיקת מחשב פשוטה לצורך המשחק
             if (pool.length > 0) compHand.push(pool.pop());
-            currentTurn = 'player'; timeLeft = 60; render();
+            currentTurn = 'player'; timeLeft = 60; 
+            saveBackup();
+            render();
         }, 1500);
     }
 
@@ -231,8 +237,12 @@
         clearInterval(timerInterval);
         timerInterval = setInterval(() => {
             if(currentTurn === 'player') {
-                timeLeft--; document.getElementById('timer').textContent = timeLeft;
-                if(timeLeft <= 0) drawAndEnd();
+                timeLeft--; 
+                document.getElementById('timer').textContent = timeLeft;
+                if(timeLeft <= 0) {
+                    showError("נגמר הזמן! המהלכים בוטלו וקיבלת אריח עונש.");
+                    drawAndEnd();
+                }
             }
         }, 1000);
     }
